@@ -2,16 +2,16 @@
   "name": "sqlite3-multiple-ciphers-wasm-checker",
   "version": "1.0.0",
   "description": "A command-line utility that fetches information about the latest release of the SQLite3MultipleCiphers project, focusing on WASM build files",
-  "main": "src/index.js",
+  "main": "bin/index.js",
   "type": "module",
   "bin": {
-    "sqlite3-multiple-ciphers-wasm-checker": "./src/index.js"
+    "sqlite3-multiple-ciphers-wasm-checker": "./bin/index.js"
   },
   "scripts": {
-    "start": "node src/index.js",
-    "debug": "node --inspect-brk src/index.js",
-    "deno": "deno run src/index.js",
-    "bun": "bun src/index.js"
+    "start": "node bin/index.js",
+    "debug": "node --inspect-brk bin/index.js",
+    "deno": "deno run bin/index.js",
+    "bun": "bun bin/index.js"
   },
   "keywords": [
     "sqlite",

@@ -16,7 +16,7 @@ cd sqlite3-multiple-ciphers-wasm-checker
 npm install
 
 # Make the script executable
-chmod +x src/index.js
+chmod +x bin/index.js
 ```
 
 ## Usage
@@ -49,7 +49,7 @@ The tool will:
 ### Direct execution
 ```bash
 # Run directly with Node
-node src/index.js
+node bin/index.js
 
 # Installing globally
 npm install -g .
