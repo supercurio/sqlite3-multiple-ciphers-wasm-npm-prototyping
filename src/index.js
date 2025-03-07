@@ -1,38 +1,31 @@
 #!/usr/bin/env node
 import fetch from 'node-fetch';
-import fs from 'fs-extra';
+import fs from 'fs';
 import decompress from 'decompress';
 
-function fetchLatestRelease(owner, repo) {
-  return new Promise(async (resolve, reject) => {
-    // Use GitHub token if available in environment variables
-    const token = process.env.GITHUB_TOKEN;
-    const headers = {
-      'User-Agent': 'Node.js GitHub Release Fetcher'
-    };
+async function fetchLatestRelease(owner, repo) {
+  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
 
-    if (token) {
-      headers['Authorization'] = `token ${token}`;
+  // Use GitHub token if available in environment variables
+  const headers = { 'User-Agent': 'Node.js GitHub Release Fetcher' };
+
+  const token = process.env.GITHUB_TOKEN;
+  if (token) { headers['Authorization'] = `token ${token}`; }
+
+  try {
+    const response = await fetch(url, { headers });
+    if (response.status === 200) {
+      return await response.json();
     }
 
-    const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
-
-    try {
-      const response = await fetch(url, { headers });
-
-      if (response.status === 200) {
-        const data = await response.json();
-        resolve(data);
-      } else if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
-        reject(new Error('GitHub API rate limit exceeded. Use GITHUB_TOKEN environment variable to increase the limit.'));
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        reject(new Error(`API request failed with status code ${response.status}: ${errorData.message || 'Unknown error'}`));
-      }
-    } catch (error) {
-      reject(new Error(`Request failed: ${error.message}`));
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+      throw new Error('GitHub API rate limit exceeded. Use GITHUB_TOKEN environment variable to increase the limit.');
     }
-  });
+    throw new Error(`API request failed with status code ${response.status}: ${errorData.message || 'Unknown error'}`);
+  } catch (error) {
+    throw new Error(`Request failed: ${error.message}`);
+  }
 }
 
 async function downloadAndUnzipSqliteWasm(sqliteWasmDownloadLink) {
@@ -61,42 +54,49 @@ async function downloadAndUnzipSqliteWasm(sqliteWasmDownloadLink) {
   fs.rmSync('sqlite-wasm.zip');
 }
 
+function displayReleaseInfo(release) {
+  console.log(`\nLatest Release: ${release?.name ?? 'unnamed'}`);
+  console.log(`Version: ${release?.tag_name ?? 'untagged'}`);
+  console.log(`Published: ${release?.published_at ? new Date(release.published_at).toLocaleString() : 'unknown'}`);
+  console.log(`\nDescription: ${release?.body ?? 'No description provided'}`);
+}
+
+function displayWasmAssets(wasmAssets) {
+  console.log('\nWASM Build Files:');
+
+  if (!wasmAssets.length) {
+    console.log('No WASM build files found in this release.');
+    return;
+  }
+
+  wasmAssets.forEach(asset => {
+    console.log(`- ${asset.name}`);
+    console.log(`  Size: ${asset.size ? (asset.size / 1024).toFixed(2) + ' KB' : 'unknown'}`);
+    console.log(`  Download: ${asset.browser_download_url}`);
+  });
+}
+
 async function main() {
   try {
     const owner = 'utelle';
     const repo = 'SQLite3MultipleCiphers';
 
     console.log(`Fetching latest release information for ${owner}/${repo}...`);
-
     const release = await fetchLatestRelease(owner, repo);
 
-    console.log(`\nLatest Release: ${release.name || 'unnamed'}`);
-    console.log(`Version: ${release.tag_name || 'untagged'}`);
-    console.log(`Published: ${release.published_at ? new Date(release.published_at).toLocaleString() : 'unknown'}`);
-    console.log(`\nDescription: ${release.body || 'No description provided'}`);
+    displayReleaseInfo(release);
 
-    console.log('\nWASM Build Files:');
-    if (release.assets && release.assets.length > 0) {
-      const wasmAssets = release.assets.filter(asset => asset.name.endsWith('-wasm.zip'));
+    // Find WASM assets inline within main
+    const wasmAssets = release?.assets?.length
+      ? release.assets.filter(asset => asset.name.endsWith('-wasm.zip'))
+      : [];
 
-      if (wasmAssets.length > 0) {
-        wasmAssets.forEach(asset => {
-          console.log(`- ${asset.name}`);
-          console.log(`  Size: ${asset.size ? (asset.size / 1024).toFixed(2) + ' KB' : 'unknown'}`);
-          console.log(`  Download: ${asset.browser_download_url}`);
-        });
+    displayWasmAssets(wasmAssets);
 
-        // Select the first WASM asset for download
-        const selectedAsset = wasmAssets[0];
-        const downloadUrl = selectedAsset.browser_download_url;
-
-        await downloadAndUnzipSqliteWasm(downloadUrl);
-
-      } else {
-        console.log('No WASM build files found in this release.');
-      }
-    } else {
-      console.log('No assets found for this release.');
+    if (wasmAssets.length) {
+      // Select the first WASM asset for download
+      const downloadUrl = wasmAssets[0].browser_download_url;
+      await downloadAndUnzipSqliteWasm(downloadUrl);
     }
   } catch (error) {
     console.error(`Error: ${error.message}`);
