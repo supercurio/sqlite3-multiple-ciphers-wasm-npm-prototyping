@@ -3,7 +3,6 @@ import fetch from 'node-fetch';
 import fs from 'fs-extra';
 import path from 'path';
 import decompress from 'decompress';
-import { createWriteStream } from 'fs';
 import { fileURLToPath } from 'url';
 
 // Get current directory
