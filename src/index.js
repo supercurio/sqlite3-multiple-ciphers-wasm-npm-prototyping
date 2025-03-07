@@ -58,22 +58,14 @@ function displayReleaseInfo(release) {
   console.log(`\nLatest Release: ${release?.name ?? 'unnamed'}`);
   console.log(`Version: ${release?.tag_name ?? 'untagged'}`);
   console.log(`Published: ${release?.published_at ? new Date(release.published_at).toLocaleString() : 'unknown'}`);
-  console.log(`\nDescription: ${release?.body ?? 'No description provided'}`);
+  console.log(`\nDescription:\n${release?.body ?? 'No description provided'}`);
 }
 
-function displayWasmAssets(wasmAssets) {
-  console.log('\nWASM Build Files:');
-
-  if (!wasmAssets.length) {
-    console.log('No WASM build files found in this release.');
-    return;
-  }
-
-  wasmAssets.forEach(asset => {
-    console.log(`- ${asset.name}`);
-    console.log(`  Size: ${asset.size ? (asset.size / 1024).toFixed(2) + ' KB' : 'unknown'}`);
-    console.log(`  Download: ${asset.browser_download_url}`);
-  });
+function displayWasmAssets(asset) {
+  console.log('\nWASM Build File:');
+  console.log(`- ${asset.name}`);
+  console.log(`  Size: ${asset.size ? (asset.size / 1024).toFixed(2) + ' KB' : 'unknown'}`);
+  console.log(`  Download: ${asset.browser_download_url}\n`);
 }
 
 async function main() {
@@ -86,18 +78,19 @@ async function main() {
 
     displayReleaseInfo(release);
 
-    // Find WASM assets inline within main
-    const wasmAssets = release?.assets?.length
-      ? release.assets.filter(asset => asset.name.endsWith('-wasm.zip'))
-      : [];
+    // Find WASM assets
+    const wasmAssets = release?.assets?.filter(asset => asset.name.endsWith('-wasm.zip')) || [];
 
-    displayWasmAssets(wasmAssets);
-
-    if (wasmAssets.length) {
-      // Select the first WASM asset for download
-      const downloadUrl = wasmAssets[0].browser_download_url;
-      await downloadAndUnzipSqliteWasm(downloadUrl);
+    // Check for exactly one WASM asset
+    if (wasmAssets.length === 0) {
+      throw new Error('No WASM assets found in the latest release.');
+    } else if (wasmAssets.length > 1) {
+      throw new Error(`Found ${wasmAssets.length} WASM assets in the release. Expected exactly 1.`);
     }
+    const wasmAsset = wasmAssets[0];
+    displayWasmAssets(wasmAsset);
+
+    await downloadAndUnzipSqliteWasm(wasmAsset.browser_download_url);
   } catch (error) {
     console.error(`Error: ${error.message}`);
     process.exit(1);
