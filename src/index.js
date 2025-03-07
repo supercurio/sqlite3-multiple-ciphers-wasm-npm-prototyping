@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 import fetch from 'node-fetch';
 import fs from 'fs-extra';
-import path from 'path';
 import decompress from 'decompress';
-import { fileURLToPath } from 'url';
-
-// Get current directory
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function fetchLatestRelease(owner, repo) {
   return new Promise(async (resolve, reject) => {
@@ -40,111 +35,30 @@ function fetchLatestRelease(owner, repo) {
   });
 }
 
-async function downloadFile(url, targetPath) {
-  try {
-    let response = await fetch(url);
-
-    // Handle redirects manually if needed
-    if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
-      console.log(`Redirecting to: ${response.headers.get('location')}`);
-      response = await fetch(response.headers.get('location'));
-    }
-
-    if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.status}`);
-    }
-
-    const stream = fs.createWriteStream(targetPath);
-
-    await new Promise((resolve, reject) => {
-      const body = response.body;
-      body.pipe(stream);
-
-      body.on('error', (err) => {
-        fs.unlink(targetPath, () => { });
-        reject(new Error(`File write error: ${err.message}`));
-      });
-
-      stream.on('finish', () => {
-        console.log(`Download completed: ${targetPath}`);
-        resolve();
-      });
-    });
-  } catch (error) {
-    await fs.unlink(targetPath).catch(() => { });
-    throw new Error(`Download error: ${error.message}`);
+async function downloadAndUnzipSqliteWasm(sqliteWasmDownloadLink) {
+  if (!sqliteWasmDownloadLink) {
+    throw new Error('Unable to find SQLite Wasm download link');
   }
-}
-
-async function extractWasmFiles(zipPath, destinationPath) {
-  try {
-    // Create a temporary directory for initial extraction
-    const tempDir = path.join(path.dirname(destinationPath), 'temp-extract');
-    await fs.ensureDir(tempDir);
-
-    // Extract the zip file to the temporary directory using decompress
-    await decompress(zipPath, tempDir);
-    
-    // Find the jswasm directory in the extracted files
-    const jswasmPath = await findJswasmDirectory(tempDir);
-
-    if (jswasmPath) {
-      console.log(`Found jswasm directory: ${jswasmPath}`);
-
-      // Create the jswasm directory in the destination
-      const jswasmDestDir = path.join(destinationPath, 'jswasm');
-      await fs.ensureDir(jswasmDestDir);
-
-      // Copy all files from jswasm directory to the destination jswasm directory
-      const files = await fs.readdir(jswasmPath);
-      for (const file of files) {
-        const sourcePath = path.join(jswasmPath, file);
-        const targetPath = path.join(jswasmDestDir, file);
-
-        // Copy the file
-        await fs.copy(sourcePath, targetPath);
-        console.log(`Copied: ${file} to ${targetPath}`);
-      }
-
-      // Clean up the temporary directory
-      await fs.remove(tempDir);
-      console.log(`Cleaned up temporary directory: ${tempDir}`);
-
-      return true;
-    } else {
-      console.error('Could not find jswasm directory in the extracted files');
-      // Clean up the temporary directory
-      await fs.remove(tempDir);
-      return false;
-    }
-  } catch (error) {
-    console.error(`Extraction failed: ${error.message}`);
-    return false;
+  console.log('Downloading and unzipping SQLite Wasm...');
+  const response = await fetch(sqliteWasmDownloadLink);
+  if (!response.ok || response.status !== 200) {
+    throw new Error(
+      `Unable to download SQLite Wasm from ${sqliteWasmDownloadLink}`,
+    );
   }
-}
-
-async function findJswasmDirectory(dir) {
-  // Try to find the jswasm directory recursively
-  const items = await fs.readdir(dir, { withFileTypes: true });
-
-  // First, check if we have a jswasm directory directly
-  const jswasmDir = items.find(item => item.isDirectory() && item.name === 'jswasm');
-  if (jswasmDir) {
-    return path.join(dir, 'jswasm');
-  }
-
-  // If not, recursively check subdirectories
-  for (const item of items) {
-    if (item.isDirectory()) {
-      const subDirPath = path.join(dir, item.name);
-      const result = await findJswasmDirectory(subDirPath);
-      if (result) {
-        return result;
-      }
-    }
-  }
-
-  return null;
+  const buffer = await response.arrayBuffer();
+  fs.writeFileSync('sqlite-wasm.zip', Buffer.from(buffer));
+  const files = await decompress('sqlite-wasm.zip', 'sqlite-wasm', {
+    strip: 1,
+    filter: (file) =>
+      /jswasm/.test(file.path) && /(\.mjs|\.wasm|\.js)$/.test(file.path),
+  });
+  console.log(
+    `Downloaded and unzipped:\n${files
+      .map((file) => (/\//.test(file.path) ? '‣ ' + file.path + '\n' : ''))
+      .join('')}`,
+  );
+  fs.rmSync('sqlite-wasm.zip');
 }
 
 async function main() {
@@ -176,22 +90,8 @@ async function main() {
         const selectedAsset = wasmAssets[0];
         const downloadUrl = selectedAsset.browser_download_url;
 
-        // Create base directory (outside of src directory)
-        const baseDir = path.resolve(path.join(__dirname, '..'));
-        const zipPath = path.join(baseDir, selectedAsset.name);
-        const extractDir = path.join(baseDir, 'sqlite-wasm');
+        await downloadAndUnzipSqliteWasm(downloadUrl);
 
-        console.log(`\nDownloading ${selectedAsset.name}...`);
-        await downloadFile(downloadUrl, zipPath);
-
-        console.log(`\nExtracting to 'sqlite-wasm' directory...`);
-        const extractResult = await extractWasmFiles(zipPath, extractDir);
-
-        if (extractResult) {
-          console.log(`\nSuccessfully downloaded and extracted the WASM build to: ${extractDir}`);
-        } else {
-          console.error('\nExtraction failed. The zip file may be corrupted or incompatible.');
-        }
       } else {
         console.log('No WASM build files found in this release.');
       }
