@@ -2,7 +2,7 @@
 import fetch from 'node-fetch';
 import fs from 'fs-extra';
 import path from 'path';
-import extract from 'extract-zip';
+import decompress from 'decompress';
 import { createWriteStream } from 'fs';
 import { fileURLToPath } from 'url';
 
@@ -55,7 +55,6 @@ async function downloadFile(url, targetPath) {
       throw new Error(`Failed to download file: ${response.status}`);
     }
 
-    const fileStream = createWriteStream(targetPath);
     const stream = fs.createWriteStream(targetPath);
 
     await new Promise((resolve, reject) => {
@@ -84,9 +83,9 @@ async function extractWasmFiles(zipPath, destinationPath) {
     const tempDir = path.join(path.dirname(destinationPath), 'temp-extract');
     await fs.ensureDir(tempDir);
 
-    // Extract the zip file to the temporary directory
-    await extract(zipPath, { dir: path.resolve(tempDir) });
-
+    // Extract the zip file to the temporary directory using decompress
+    await decompress(zipPath, tempDir);
+    
     // Find the jswasm directory in the extracted files
     const jswasmPath = await findJswasmDirectory(tempDir);
 
