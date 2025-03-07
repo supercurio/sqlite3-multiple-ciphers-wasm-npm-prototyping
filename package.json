@@ -24,9 +24,8 @@
   "author": "Your Name",
   "license": "ISC",
   "dependencies": {
-    "node-fetch": "^3.3.0",
-    "fs-extra": "^11.1.1",
-    "decompress": "^4.2.1"
+    "decompress": "^4.2.1",
+    "node-fetch": "^3.3.0"
   },
   "engines": {
     "node": ">=14.16.0"
