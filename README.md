@@ -3,7 +3,7 @@ A command-line utility that fetches information about the latest release of the 
 
 ## ⚠️ This is only a prototype
 This repo is a prototype for code I'm considering using in a fork of the `@sqlite.org/sqlite-wasm` package, as found on [npm](https://www.npmjs.com/package/@sqlite.org/sqlite-wasm) and [github](https://github.com/sqlite/sqlite-wasm).
-The purpose of this fork would be to provide a npm package using @utelle [SQLite3MultipleCiphers](https://github.com/utelle/SQLite3MultipleCiphers) WASM build as drop-in replacement.
+The purpose of this fork would be to provide a npm package using  Ulrich Telle's  [SQLite3MultipleCiphers](https://github.com/utelle/SQLite3MultipleCiphers) WASM build as drop-in replacement.
 
 
 ## Installation
