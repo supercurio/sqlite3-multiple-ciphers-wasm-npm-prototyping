@@ -4,29 +4,29 @@ import fs from 'fs';
 import decompress from 'decompress';
 
 async function fetchLatestRelease(owner, repo) {
-    const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
-    const headers = {
-        'User-Agent': 'Node.js GitHub Release Fetcher',
-        ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` })
-    };
+  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+  const headers = {
+    'User-Agent': 'Node.js GitHub Release Fetcher',
+    ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` })
+  };
 
-    let response;
-    try {
-        response = await fetch(url, { headers });
-    } catch (error) {
-        throw new Error(`Network request failed: ${error.message}`);
-    }
+  let response;
+  try {
+    response = await fetch(url, { headers });
+  } catch (error) {
+    throw new Error(`Network request failed: ${error.message}`);
+  }
 
-    if (response.ok) {
-        return response.json();
-    }
+  if (response.ok) {
+    return response.json();
+  }
 
-    if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
-        throw new Error('GitHub API rate limit exceeded. Use GITHUB_TOKEN environment variable to increase the limit.');
-    }
+  if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+    throw new Error('GitHub API rate limit exceeded. Use GITHUB_TOKEN environment variable to increase the limit.');
+  }
 
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`API request failed with status code ${response.status}: ${errorData.message || 'Unknown error'}`);
+  const errorData = await response.json().catch(() => ({}));
+  throw new Error(`API request failed with status code ${response.status}: ${errorData.message || 'Unknown error'}`);
 }
 
 async function downloadAndUnzipSqliteWasm(sqliteWasmDownloadLink) {
