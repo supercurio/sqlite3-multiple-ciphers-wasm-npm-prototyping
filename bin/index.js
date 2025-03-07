@@ -4,28 +4,29 @@ import fs from 'fs';
 import decompress from 'decompress';
 
 async function fetchLatestRelease(owner, repo) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+    const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+    const headers = {
+        'User-Agent': 'Node.js GitHub Release Fetcher',
+        ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` })
+    };
 
-  // Use GitHub token if available in environment variables
-  const headers = { 'User-Agent': 'Node.js GitHub Release Fetcher' };
+    let response;
+    try {
+        response = await fetch(url, { headers });
+    } catch (error) {
+        throw new Error(`Network request failed: ${error.message}`);
+    }
 
-  const token = process.env.GITHUB_TOKEN;
-  if (token) { headers['Authorization'] = `token ${token}`; }
+    if (response.ok) {
+        return response.json();
+    }
 
-  try {
-    const response = await fetch(url, { headers });
-    if (response.status === 200) {
-      return await response.json();
+    if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+        throw new Error('GitHub API rate limit exceeded. Use GITHUB_TOKEN environment variable to increase the limit.');
     }
 
     const errorData = await response.json().catch(() => ({}));
-    if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
-      throw new Error('GitHub API rate limit exceeded. Use GITHUB_TOKEN environment variable to increase the limit.');
-    }
     throw new Error(`API request failed with status code ${response.status}: ${errorData.message || 'Unknown error'}`);
-  } catch (error) {
-    throw new Error(`Request failed: ${error.message}`);
-  }
 }
 
 async function downloadAndUnzipSqliteWasm(sqliteWasmDownloadLink) {
@@ -69,11 +70,11 @@ function displayWasmAssets(asset) {
 }
 
 async function main() {
-  try {
-    const owner = 'utelle';
-    const repo = 'SQLite3MultipleCiphers';
+  const owner = 'utelle';
+  const repo = 'SQLite3MultipleCiphers';
 
-    console.log(`Fetching latest release information for ${owner}/${repo}...`);
+  console.log(`Fetching latest release information for ${owner}/${repo}...`);
+  try {
     const release = await fetchLatestRelease(owner, repo);
 
     displayReleaseInfo(release);
