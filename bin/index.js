@@ -5,10 +5,11 @@ import decompress from 'decompress';
 
 async function fetchLatestRelease(owner, repo) {
   const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
-  const headers = {
-    'User-Agent': 'Node.js GitHub Release Fetcher',
-    ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` })
-  };
+  let headers = {};
+  // Use GITHUB_TOKEN if available to avoid rate limiting
+  if (process.env.GITHUB_TOKEN) {
+    headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
+  }
 
   let response;
   try {
@@ -21,12 +22,15 @@ async function fetchLatestRelease(owner, repo) {
     return response.json();
   }
 
-  if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
-    throw new Error('GitHub API rate limit exceeded. Use GITHUB_TOKEN environment variable to increase the limit.');
+  if (response.status === 403 &&
+    response.headers.get('x-ratelimit-remaining') === '0') {
+    throw new Error('GitHub API rate limit exceeded. ' +
+      'Use GITHUB_TOKEN environment variable to increase the limit.');
   }
 
   const errorData = await response.json().catch(() => ({}));
-  throw new Error(`API request failed with status code ${response.status}: ${errorData.message || 'Unknown error'}`);
+  throw new Error(`API request failed with status code ${response.status}:
+     ${errorData.message || 'Unknown error'}`);
 }
 
 async function downloadAndUnzipSqliteWasm(sqliteWasmDownloadLink) {
@@ -58,14 +62,16 @@ async function downloadAndUnzipSqliteWasm(sqliteWasmDownloadLink) {
 function displayReleaseInfo(release) {
   console.log(`\nLatest Release: ${release?.name ?? 'unnamed'}`);
   console.log(`Version: ${release?.tag_name ?? 'untagged'}`);
-  console.log(`Published: ${release?.published_at ? new Date(release.published_at).toLocaleString() : 'unknown'}`);
+  console.log(`Published: ${release?.published_at ?
+    new Date(release.published_at).toLocaleString() : 'unknown'}`);
   console.log(`\nDescription:\n${release?.body ?? 'No description provided'}`);
 }
 
 function displayWasmAssets(asset) {
   console.log('\nWASM Build File:');
   console.log(`- ${asset.name}`);
-  console.log(`  Size: ${asset.size ? (asset.size / 1024).toFixed(2) + ' KB' : 'unknown'}`);
+  console.log(`  Size: ${asset.size ?
+    (asset.size / 1024).toFixed(2) + ' KB' : 'unknown'}`);
   console.log(`  Download: ${asset.browser_download_url}\n`);
 }
 
@@ -80,13 +86,16 @@ async function main() {
     displayReleaseInfo(release);
 
     // Find WASM assets
-    const wasmAssets = release?.assets?.filter(asset => asset.name.endsWith('-wasm.zip')) || [];
+    const wasmAssets = release
+      ?.assets
+      ?.filter(asset => asset.name.endsWith('-wasm.zip')) || [];
 
     // Check for exactly one WASM asset
     if (wasmAssets.length === 0) {
       throw new Error('No WASM assets found in the latest release.');
     } else if (wasmAssets.length > 1) {
-      throw new Error(`Found ${wasmAssets.length} WASM assets in the release. Expected exactly 1.`);
+      throw new Error(`Found ${wasmAssets.length} ` +
+        'WASM assets in the release. Expected exactly 1.');
     }
     const wasmAsset = wasmAssets[0];
     displayWasmAssets(wasmAsset);
